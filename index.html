@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1e8">
+  <title>扫雷 | Minesweeper</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f4f1e8;
+      --ink: #1d302d;
+      --muted: #71817a;
+      --green: #244d42;
+      --green-deep: #173a32;
+      --lime: #d9ed9d;
+      --line: #d8ded1;
+      --tile: #e0e7d9;
+      --tile-open: #fbfaf5;
+      --red: #d95e4d;
+      --cell-size: 36px;
+      font-family: "Trebuchet MS", "Avenir Next", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: radial-gradient(#bcc9b7 0.7px, transparent 0.7px);
+      background-size: 18px 18px;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .page {
+      width: min(100% - 32px, 980px);
+      margin: 0 auto;
+      padding: 30px 0 42px;
+    }
+
+    .masthead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border-radius: 13px;
+      color: var(--lime);
+      background: var(--green);
+      font-size: 23px;
+    }
+
+    .eyebrow {
+      margin: 0 0 2px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 27px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .edition {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    main { padding-top: 27px; }
+
+    .game-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 15px;
+    }
+
+    .game-title { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: 25px; }
+    .game-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
+
+    .new-game {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 5px;
+      color: #fff;
+      background: var(--green);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      transition: background 140ms ease, transform 140ms ease;
+    }
+
+    .new-game:hover { background: var(--green-deep); transform: translateY(-1px); }
+    .new-game:focus-visible, input:focus-visible, .cell:focus-visible { outline: 3px solid #81a65a; outline-offset: 2px; }
+
+    .game-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 235px;
+      align-items: start;
+      gap: 18px;
+    }
+
+    .play-area { min-width: 0; }
+
+    .scorebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 61px;
+      padding: 10px 15px;
+      border: 1px solid var(--line);
+      border-bottom: 0;
+      border-radius: 6px 6px 0 0;
+      background: #fffdf8;
+    }
+
+    .counter { display: flex; align-items: center; gap: 9px; }
+    .counter-icon { font-size: 17px; }
+    .counter-label { display: block; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: 0.7px; }
+    .counter-value { display: block; margin-top: 1px; font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 900; }
+
+    .status {
+      padding: 6px 9px;
+      border-radius: 4px;
+      color: var(--green);
+      background: #e8efdc;
+      font-size: 11px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+    .status[data-state="won"] { color: #325718; background: var(--lime); }
+    .status[data-state="lost"] { color: #8d342a; background: #f5d9d2; }
+
+    .board-wrap {
+      max-width: 100%;
+      overflow: auto;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 0 0 6px 6px;
+      background: #e9e7dc;
+      box-shadow: 0 12px 28px #31423912;
+      scrollbar-color: #aab5a2 #e9e7dc;
+    }
+
+    #board {
+      display: grid;
+      width: max-content;
+      gap: 2px;
+      margin: 0 auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .cell {
+      display: grid;
+      width: var(--cell-size);
+      height: var(--cell-size);
+      padding: 0;
+      place-items: center;
+      border: 0;
+      border-radius: 3px;
+      color: var(--ink);
+      background: var(--tile);
+      box-shadow: inset 0 0 0 1px #cbd5c6;
+      cursor: pointer;
+      font-size: calc(var(--cell-size) * 0.53);
+      font-weight: 900;
+      line-height: 1;
+      transition: background 90ms ease, transform 90ms ease;
+      touch-action: manipulation;
+    }
+
+    .cell:not(.revealed):hover { background: #d1ddc9; transform: translateY(-1px); }
+    .cell.revealed { background: var(--tile-open); box-shadow: inset 0 0 0 1px #e8e6dc; cursor: default; }
+    .cell.revealed:active { transform: none; }
+    .cell.boom { color: #fff; background: var(--red) !important; }
+    .cell.wrong-flag { color: #9c3b31; background: #f5ddd5 !important; font-size: calc(var(--cell-size) * 0.43); }
+    .cell.n1 { color: #2873b9; }
+    .cell.n2 { color: #438544; }
+    .cell.n3 { color: #d14c43; }
+    .cell.n4 { color: #6250a0; }
+    .cell.n5 { color: #a75134; }
+    .cell.n6 { color: #2c9290; }
+    .cell.n7 { color: #36443c; }
+    .cell.n8 { color: #858b84; }
+
+    .settings {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fffdf8;
+    }
+
+    .settings h3 { margin: 0 0 13px; font-size: 13px; font-weight: 900; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field { display: grid; gap: 5px; color: var(--muted); font-size: 11px; font-weight: 800; }
+    .field:last-child { grid-column: 1 / -1; }
+    .field input {
+      width: 100%;
+      min-width: 0;
+      height: 36px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      background: #fff;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .settings-note {
+      margin: 14px 0 0;
+      padding-top: 12px;
+      border-top: 1px solid #e8e9e0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .message {
+      min-height: 22px;
+      margin: 11px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .message[data-state="won"] { color: #466a21; }
+    .message[data-state="lost"] { color: #a34438; }
+
+    @media (max-width: 700px) {
+      .page { width: min(100% - 24px, 520px); padding-top: 18px; }
+      main { padding-top: 20px; }
+      .game-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+      .settings { order: -1; padding: 12px; }
+      .settings h3 { margin-bottom: 9px; }
+      .fields { grid-template-columns: 1fr 1fr 1.2fr; }
+      .field:last-child { grid-column: auto; }
+      .settings-note { display: none; }
+      .board-wrap { padding: 8px; }
+    }
+
+    @media (max-width: 420px) {
+      .page { width: calc(100% - 16px); }
+      .masthead { padding-bottom: 13px; }
+      .edition { padding: 6px 7px; font-size: 9px; }
+      .brand-mark { width: 36px; height: 36px; font-size: 20px; }
+      h1 { font-size: 23px; }
+      .game-head { align-items: center; }
+      .game-title { font-size: 21px; }
+      .game-subtitle { font-size: 11px; }
+      .new-game { min-height: 37px; padding: 0 10px; font-size: 12px; }
+      .scorebar { min-height: 55px; padding: 8px 10px; }
+      .counter { gap: 6px; }
+      .counter-icon { font-size: 15px; }
+      .counter-value { font-size: 15px; }
+      .status { padding: 5px 7px; font-size: 10px; }
+      .board-wrap { padding: 5px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">✳</div>
+        <div>
+          <p class="eyebrow">FIELD NOTES · 01</p>
+          <h1>扫雷</h1>
+        </div>
+      </div>
+      <div class="edition">MINESWEEPER / WEB EDITION</div>
+    </header>
+
+    <main>
+      <div class="game-head">
+        <div>
+          <h2 class="game-title">清理雷区</h2>
+          <p class="game-subtitle">揭开安全格，标记所有地雷。</p>
+        </div>
+        <button class="new-game" id="new-game" type="button"><span aria-hidden="true">↻</span> 新游戏</button>
+      </div>
+
+      <div class="game-layout">
+        <section class="play-area" aria-label="扫雷棋盘">
+          <div class="scorebar">
+            <div class="counter"><span class="counter-icon" aria-hidden="true">✹</span><div><span class="counter-label">地雷</span><span class="counter-value" id="mine-count">10</span></div></div>
+            <div class="status" id="status" data-state="playing" role="status">进行中</div>
+            <div class="counter"><span class="counter-icon" aria-hidden="true">⚑</span><div><span class="counter-label">旗帜</span><span class="counter-value" id="flag-count">0</span></div></div>
+          </div>
+          <div class="board-wrap"><div id="board" role="grid" aria-label="扫雷棋盘"></div></div>
+          <p class="message" id="message" aria-live="polite">左键揭开 · 右键插旗</p>
+        </section>
+
+        <aside class="settings" aria-label="棋盘设置">
+          <h3>棋盘设置</h3>
+          <div class="fields">
+            <label class="field">行数<input id="rows-input" type="number" min="1" max="50" value="9"></label>
+            <label class="field">列数<input id="cols-input" type="number" min="1" max="40" value="9"></label>
+            <label class="field">地雷数<input id="mines-input" type="number" min="1" value="10"></label>
+          </div>
+          <p class="settings-note">首次揭开时生成雷区。数字表示周围八格中的地雷数量；点击数字可按旗帜数量尝试展开邻格。</p>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    'use strict';
+
+    const MAX_ROWS = 50;
+    const MAX_COLS = 40;
+    const DEFAULTS = { rows: 9, cols: 9, mines: 10 };
+    const boardElement = document.getElementById('board');
+    const statusElement = document.getElementById('status');
+    const messageElement = document.getElementById('message');
+    const mineCountElement = document.getElementById('mine-count');
+    const flagCountElement = document.getElementById('flag-count');
+    const rowsInput = document.getElementById('rows-input');
+    const colsInput = document.getElementById('cols-input');
+    const minesInput = document.getElementById('mines-input');
+
+    let game;
+
+    function createGame(rows, cols, mines) {
+      game = {
+        rows,
+        cols,
+        totalMines: mines,
+        flags: 0,
+        state: 'playing',
+        started: false,
+        boom: null,
+        cells: Array.from({ length: rows }, () => Array.from({ length: cols }, () => ({
+          mine: false,
+          revealed: false,
+          flagged: false,
+          adjacent: 0
+        })))
+      };
+      messageElement.textContent = '左键揭开 · 右键插旗';
+      render();
+    }
+
+    function placeMines(safeRow, safeCol) {
+      const candidates = [];
+      const canProtectArea = game.rows * game.cols - 9 >= game.totalMines;
+      for (let row = 0; row < game.rows; row++) {
+        for (let col = 0; col < game.cols; col++) {
+          const inSafeArea = Math.abs(row - safeRow) <= 1 && Math.abs(col - safeCol) <= 1;
+          if ((canProtectArea && inSafeArea) || (!canProtectArea && row === safeRow && col === safeCol)) continue;
+          candidates.push(game.cells[row][col]);
+        }
+      }
+      for (let index = candidates.length - 1; index > 0; index--) {
+        const swapIndex = Math.floor(Math.random() * (index + 1));
+        [candidates[index], candidates[swapIndex]] = [candidates[swapIndex], candidates[index]];
+      }
+      for (let index = 0; index < game.totalMines; index++) candidates[index].mine = true;
+
+      for (let row = 0; row < game.rows; row++) {
+        for (let col = 0; col < game.cols; col++) {
+          const cell = game.cells[row][col];
+          if (cell.mine) continue;
+          cell.adjacent = neighbors(row, col).filter(([r, c]) => game.cells[r][c].mine).length;
+        }
+      }
+      game.started = true;
+    }
+
+    function neighbors(row, col) {
+      const result = [];
+      for (let rowOffset = -1; rowOffset <= 1; rowOffset++) {
+        for (let colOffset = -1; colOffset <= 1; colOffset++) {
+          if (rowOffset === 0 && colOffset === 0) continue;
+          const nextRow = row + rowOffset;
+          const nextCol = col + colOffset;
+          if (nextRow >= 0 && nextRow < game.rows && nextCol >= 0 && nextCol < game.cols) {
+            result.push([nextRow, nextCol]);
+          }
+        }
+      }
+      return result;
+    }
+
+    function revealFlood(row, col) {
+      const pending = [[row, col]];
+      while (pending.length) {
+        const [currentRow, currentCol] = pending.pop();
+        if (currentRow < 0 || currentRow >= game.rows || currentCol < 0 || currentCol >= game.cols) continue;
+        const cell = game.cells[currentRow][currentCol];
+        if (cell.revealed || cell.flagged || cell.mine) continue;
+        cell.revealed = true;
+        if (cell.adjacent === 0) pending.push(...neighbors(currentRow, currentCol));
+      }
+    }
+
+    function isGuessSituation() {
+      let unrevealed = 0;
+      let mines = 0;
+      for (const row of game.cells) {
+        for (const cell of row) {
+          if (cell.revealed) continue;
+          unrevealed++;
+          if (cell.mine) mines++;
+        }
+      }
+      return unrevealed === 2 && mines === 1;
+    }
+
+    function winAutomatically() {
+      for (const row of game.cells) {
+        for (const cell of row) {
+          if (!cell.mine) cell.revealed = true;
+        }
+      }
+      game.state = 'won';
+    }
+
+    function hasWon() {
+      return game.cells.every(row => row.every(cell => cell.mine || cell.revealed));
+    }
+
+    function reveal(row, col) {
+      if (game.state !== 'playing') return;
+      const cell = game.cells[row]?.[col];
+      if (!cell || cell.flagged || cell.revealed) return;
+      if (!game.started) placeMines(row, col);
+      if (isGuessSituation()) {
+        winAutomatically();
+      } else if (cell.mine) {
+        cell.revealed = true;
+        game.state = 'lost';
+        game.boom = [row, col];
+      } else {
+        revealFlood(row, col);
+        if (hasWon()) game.state = 'won';
+      }
+      render();
+    }
+
+    function toggleFlag(row, col) {
+      if (game.state !== 'playing') return;
+      const cell = game.cells[row]?.[col];
+      if (!cell || cell.revealed) return;
+      cell.flagged = !cell.flagged;
+      game.flags += cell.flagged ? 1 : -1;
+      render();
+    }
+
+    function chord(row, col) {
+      if (game.state !== 'playing') return;
+      const cell = game.cells[row]?.[col];
+      if (!cell || !cell.revealed || cell.mine) return;
+      const adjacent = neighbors(row, col);
+      const adjacentFlags = adjacent.filter(([r, c]) => game.cells[r][c].flagged).length;
+      if (adjacentFlags !== cell.adjacent) return;
+
+      let changed = false;
+      for (const [nextRow, nextCol] of adjacent) {
+        const neighbor = game.cells[nextRow][nextCol];
+        if (neighbor.revealed || neighbor.flagged) continue;
+        if (isGuessSituation()) {
+          winAutomatically();
+          render();
+          return;
+        }
+        if (neighbor.mine) {
+          neighbor.revealed = true;
+          game.state = 'lost';
+          game.boom = [nextRow, nextCol];
+          render();
+          return;
+        }
+        revealFlood(nextRow, nextCol);
+        changed = true;
+      }
+      if (changed && hasWon()) game.state = 'won';
+      if (changed) render();
+    }
+
+    function cellPresentation(cell, row, col) {
+      if (game.state === 'playing') {
+        if (cell.flagged) return { text: '⚑', className: 'flagged', label: `第${row + 1}行第${col + 1}列，已插旗` };
+        if (cell.revealed) return { text: cell.adjacent || '', className: `revealed n${cell.adjacent}`, label: `第${row + 1}行第${col + 1}列，${cell.adjacent ? `周围有${cell.adjacent}颗雷` : '空白'}` };
+        return { text: '', className: '', label: `第${row + 1}行第${col + 1}列，未揭开` };
+      }
+      if (game.state === 'lost') {
+        if (game.boom[0] === row && game.boom[1] === col) return { text: '✹', className: 'revealed boom', label: '引爆的地雷' };
+        if (cell.flagged && !cell.mine) return { text: '×', className: 'revealed wrong-flag', label: '错误的旗帜' };
+        if (cell.mine) return { text: '✹', className: 'revealed mine', label: '地雷' };
+      } else if (cell.mine) {
+        return { text: '✹', className: 'revealed mine', label: '地雷' };
+      }
+      return { text: cell.adjacent || '', className: `revealed n${cell.adjacent}`, label: `第${row + 1}行第${col + 1}列，${cell.adjacent ? `周围有${cell.adjacent}颗雷` : '空白'}` };
+    }
+
+    function render() {
+      const availableWidth = Math.max(180, Math.min(window.innerWidth - 88, 620));
+      const availableHeight = Math.max(160, window.innerHeight - 300);
+      const size = Math.max(16, Math.min(42, Math.floor((availableWidth - game.cols * 2) / game.cols), Math.floor((availableHeight - game.rows * 2) / game.rows)));
+      document.documentElement.style.setProperty('--cell-size', `${size}px`);
+      boardElement.style.gridTemplateColumns = `repeat(${game.cols}, ${size}px)`;
+      boardElement.replaceChildren();
+
+      const fragment = document.createDocumentFragment();
+      for (let row = 0; row < game.rows; row++) {
+        for (let col = 0; col < game.cols; col++) {
+          const cell = game.cells[row][col];
+          const presentation = cellPresentation(cell, row, col);
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = `cell ${presentation.className}`.trim();
+          button.textContent = presentation.text;
+          button.setAttribute('role', 'gridcell');
+          button.setAttribute('aria-label', presentation.label);
+          button.addEventListener('click', () => cell.revealed ? chord(row, col) : reveal(row, col));
+          button.addEventListener('contextmenu', event => {
+            event.preventDefault();
+            toggleFlag(row, col);
+          });
+          fragment.appendChild(button);
+        }
+      }
+      boardElement.appendChild(fragment);
+      mineCountElement.textContent = game.totalMines;
+      flagCountElement.textContent = game.flags;
+      const labels = { playing: '进行中', won: '胜利', lost: '游戏结束' };
+      statusElement.textContent = labels[game.state];
+      statusElement.dataset.state = game.state;
+      messageElement.dataset.state = game.state;
+      if (game.state === 'won') messageElement.textContent = '雷区已清理完成！';
+      if (game.state === 'lost') messageElement.textContent = '踩到地雷了，再试一次吧。';
+    }
+
+    function startNewGame() {
+      const rows = Math.min(MAX_ROWS, Math.max(1, Number.parseInt(rowsInput.value, 10) || DEFAULTS.rows));
+      const cols = Math.min(MAX_COLS, Math.max(1, Number.parseInt(colsInput.value, 10) || DEFAULTS.cols));
+      const mines = Math.min(rows * cols - 1, Math.max(1, Number.parseInt(minesInput.value, 10) || DEFAULTS.mines));
+      rowsInput.value = rows;
+      colsInput.value = cols;
+      minesInput.max = Math.max(1, rows * cols - 1);
+      minesInput.value = mines;
+      createGame(rows, cols, mines);
+    }
+
+    document.getElementById('new-game').addEventListener('click', startNewGame);
+    window.addEventListener('resize', render);
+    [rowsInput, colsInput].forEach(input => input.addEventListener('change', () => {
+      const rows = Math.min(MAX_ROWS, Math.max(1, Number.parseInt(rowsInput.value, 10) || DEFAULTS.rows));
+      const cols = Math.min(MAX_COLS, Math.max(1, Number.parseInt(colsInput.value, 10) || DEFAULTS.cols));
+      minesInput.max = Math.max(1, rows * cols - 1);
+    }));
+    startNewGame();
+  </script>
+</body>
+</html>
